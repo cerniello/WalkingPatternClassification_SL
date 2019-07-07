@@ -1,0 +1,2 @@
+# WalkingPatternClassification_SL
+Statistical Learning Project
