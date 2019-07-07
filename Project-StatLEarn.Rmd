@@ -1,0 +1,288 @@
+---
+title: "Project - Statistical Learning"
+author: "Francesco, Francisca, Ivana, Joanna, Michele,"
+date: "July 5, 2019"
+output: html_document
+---
+# Introduction
+
+TODO:  Copy from the milestone...
+
+
+-------------------------------------------------------------------
+
+## Data Pre-processing
+
+1. We removed from our data (directly from the Science Journal application) the beginning (1 minute) and the ending (1 minute) as we wanted to ignore time between setting a recording and walking activity.
+
+
+2. As we are using data that are received from the phone sensors, we are getting rather a noisy data. Hence, the additional filtering is required. In our project we are applying two common techinques: low-pass and high-pass filter. We want to filter out the portion of the acceleration data caused by a gravity from the portion of the data that is caused by motion of the accelometer - the data we are interested in.
+
+  #TODO : to be considered.
+
+**Loading all the csv files as separated dataframes**
+
+```{r}
+Ivana.df <- read.csv('data_files/Ivana_2walk-Samsung Recording 1-cropped')
+Francesco.df <- read.csv('data_files/Francesco_2walk-Samsung Recording 2-cropped')
+Michele.df <- read.csv('data_files/Michele_2walk-Samsung Recording 2-cropped')
+Francisca.df <- read.csv('data_files/Francisca_2walk-Samsung Recording 1-cropped')
+Joanna.df <- read.csv('data_files/Asia_2walk-Samsung Recording 1-cropped')
+```
+
+**Omitting ALL NULL values in each data frame**
+
+```{r}
+
+### MESSAGE: script works both for data with NANs and without NANs
+
+# Ivana.df <- na.omit(Ivana.df)
+# Francesco.df <- na.omit(Francesco.df)
+# Michele.df <- na.omit(Michele.df)
+# Francisca.df <- na.omit(Francisca.df)
+# Joanna.df <- na.omit(Joanna.df)
+```
+
+**Data Visualisation**
+
+```{r}
+#dataframes <- list(Ivana.df, Francesco.df, Michele.df, Francisca.df, Joanna.df)
+
+acc.type.plots <- function(column="AccX", ylim.min = 0, ylim.max = 28){
+  par(mfrow=c(3,2))
+  
+  plot(Ivana.df$relative_time/1000, Ivana.df[[column]], type = "l", col="red", 
+       main = paste0(column, " - Ivana"), ylim = c(ylim.min, ylim.max),
+       ylab = "m/s2", xlab = "seconds")
+  plot(Francesco.df$relative_time/1000, Francesco.df[[column]], type = "l", col="blue", 
+       main = paste0(column, " - Francesco"), ylim = c(ylim.min, ylim.max),
+       ylab = "m/s2", xlab = "seconds")
+  plot(Michele.df$relative_time/1000, Michele.df[[column]], type = "l", col="green", 
+       main = paste0(column, " - Michele"), ylim = c(ylim.min, ylim.max),
+       ylab = "m/s2", xlab = "seconds")
+  plot(Francisca.df$relative_time/1000, Francisca.df[[column]], type = "l", col="orchid", 
+       main = paste0(column, " - Francisca"), ylim = c(ylim.min, ylim.max),
+       ylab = "m/s2", xlab = "seconds")
+  plot(Joanna.df$relative_time/1000, Joanna.df[[column]], type = "l", col="orange", 
+       main = paste0(column, " - Joanna"), ylim = c(ylim.min, ylim.max),
+       ylab = "m/s2", xlab = "seconds")
+}
+
+
+
+acc.type.plots(column="AccX", ylim.min = -3, ylim.max = 30)
+acc.type.plots(column="AccY", ylim.min = -11, ylim.max = 15)
+acc.type.plots(column="AccZ", ylim.min = -30, ylim.max = 23)
+acc.type.plots(column="LinearAccelerometerSensor", ylim.min = -3, ylim.max = 25)
+```
+
+
+-----------------------------
+
+
+**Slicer** is a function for creating bins for each dataset. 
+You need to specify window.size and overlap size for dividing your data.
+Function returns a list of all bins i.e. bins = [(1, 2, 3), (3, 4), (5, 6, 7, 8, 9), (10, 11, 12, 13) ...] 
+where each number corresponds to a row index of dataframe.
+
+```{r}
+### It is a function that obtains possible bins for each dataset
+
+slicer <- function(df, window.size=200, overlap = 100){
+  # non-overlap size
+  non_overlap <- window.size - overlap
+  
+  # starting index 
+  from <- 1
+  
+  # starting relative time
+  start <- df[["relative_time"]][1]
+  
+  # vector for created bins
+  bins <- list()
+  counter <- 1
+  
+  done <- FALSE
+  while (done != TRUE) {
+    # get possible bin indexes  = [start, end)
+    bin.idx <- c(from, from + window.size)
+    
+    # get relative time indexes appropriate for that bin and save to bins vector
+    bin <- c()
+    for(i in start:nrow(df)) ifelse(df$relative_time[i] < bin.idx[2], bin <- c(bin, i), break)
+    
+    if(is.null(bin) == FALSE) {
+      bins[[counter]] <- bin
+      counter = counter + 1
+    }
+    
+    # switch starting index for the next bin
+    from <- from + non_overlap
+    #start <- i
+    start <- which(df$relative_time >= from)[1]
+
+    # terminating condition:
+    if(from > df[["relative_time"]][nrow(df)]) done <- TRUE
+  }
+  
+  return(bins)
+  }
+```
+
+Now, we are checking the possible number of bins generated under specific parameters.
+
+```{r}
+## Numbers of possible bins with specific window.size and overlap
+window.size = 200
+overlap = 100
+
+Ivana.bins <- slicer(Ivana.df, window.size=window.size, overlap = overlap)
+paste("Ivana", length(Ivana.bins))
+Michele.bins <- slicer(Michele.df, window.size=window.size, overlap = overlap)
+paste("Michele", length(Michele.bins))
+Francesco.bins <- slicer(Francesco.df, window.size=window.size, overlap = overlap)
+paste("Francesco",length(Francesco.bins))
+Francisca.bins <- slicer(Francisca.df, window.size=window.size, overlap = overlap)
+paste("Francisca", length(Francisca.bins))
+Joanna.bins <- slicer(Joanna.df, window.size=window.size, overlap = overlap)
+paste("Joanna", length(Joanna.bins))
+```
+
+This is an example of a first bin for Ivana dataset with window.size=200 and overlap=100.
+
+```{r}
+Ivana.df[Ivana.bins[[1]], ]
+```
+
+
+------------------------------
+**Generating features**
+
+```{r}
+# function which computes the absolute difference
+absolute_diff <- function(xx){
+  ## calculated only for rows without NANs
+  xx <- na.omit(xx)
+  return((1/length(xx)) * sum(abs(xx - mean(xx))))
+}
+```
+
+
+The **build.features** function takes as an input dataframe and bins for that dataframe and generates a dataframe with features.
+
+
+```{r}
+build.features <- function(df, bins, person_ID){
+  # initialize a feature dataframe
+  feature.df <- data.frame()
+  
+  # iterate through bins, generate features and add to feature dataframe
+  for(bin.ids in bins){
+    bin <- df[bin.ids, ]
+    created_obs <- data.frame(mean(bin$AccX, na.rm = TRUE), 
+                              sd(bin$AccX, na.rm = TRUE), 
+                              absolute_diff(bin$AccX), 
+                              mean(bin$AccY, na.rm = TRUE),
+                              sd(bin$AccY, na.rm = TRUE),
+                              absolute_diff(bin$AccY), 
+                              mean(bin$AccZ, na.rm = TRUE), 
+                              sd(bin$AccZ, na.rm = TRUE),
+                              absolute_diff(bin$AccZ), 
+                              mean(bin$LinearAccelerometerSensor, na.rm = TRUE), 
+                              person_ID)
+    feature.df <- rbind(feature.df, created_obs)
+  }
+  
+  names(feature.df) <- c('meanAccX', 'sdAccX', 'absdiff_AccX', 
+                         'meanAccY', 'sdAccY', 'absdiff_AccY',
+                         'meanAccZ', 'sdAccZ', 'absdiff_AccZ', 
+                         'meanAccLin', 'person_ID')
+  return(feature.df)
+}
+
+```
+
+Datframe with features + (AccX, AccY, AccZ, AccLin) average behaviour of Francesco's walk.
+
+```{r}
+Francesco.feature.df <- build.features(Francesco.df, Francesco.bins, person_ID = 1)
+Francisca.feature.df <- build.features(Francisca.df, Francisca.bins, person_ID = 2)
+Ivana.feature.df <- build.features(Ivana.df, Ivana.bins, person_ID = 3)
+Joanna.feature.df <- build.features(Joanna.df, Joanna.bins, person_ID = 4)
+Michele.feature.df <- build.features(Michele.df, Michele.bins, person_ID = 5)
+
+# example with Francesco's walk
+Francesco.feature.df[1:4, ]
+
+# plotting main features (AccX, AccY, AccZ, LinAcc) of Ivana's walk
+plot(Francesco.feature.df$meanAccX, col = "blue", ylim = c(-13,18), type = "l",
+     ylab = "")
+points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccY, 
+       type = "l", col = "red")
+points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccZ,
+       type = "l", col = "green")
+points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccLin,
+       type = "l", col = "orange")
+title("main features of (only) Francesco's walk pattern")
+legend("bottomleft", legend=c("avg(AccX)", 'avg(AccY)', 'avg(AccZ)', 'avg(AccLin)'),
+       col = c("blue", 'red', "green", 'orange'), lwd = c(1,1,1,1), bty = "n")
+```
+
+Merging the dataframe: 
+
+```{r}
+walks.df <- rbind(Francesco.feature.df, Francisca.feature.df,
+                  Ivana.feature.df, Joanna.feature.df, Michele.feature.df)
+
+nrow(walks.df)
+walks.df <- na.omit(walks.df)
+nrow(walks.df)
+# reindex
+rownames(walks.df) <- NULL
+
+head(walks.df)
+```
+
+Splitting dataframe in training and test sets using **createDataPartition** function. We put 80% of the data to training set.
+
+```{r}
+# createDataPartition split data in function of ``person_ID´´ feature
+set.seed(13401)
+
+# idx for the training set
+idx.train <- caret::createDataPartition(walks.df$person_ID, p = 0.8, list = FALSE)
+
+# making X_train and y_train sets
+X_train <- walks.df[idx.train, ]
+y_train <- as.factor(X_train$person_ID)
+X_train$person_ID <- NULL
+
+# making test set
+X_test <- walks.df[-idx.train, ]
+y_test <- X_test$person_ID
+X_test$person_ID <- NULL
+```
+
+Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
+
+```{r}
+library(randomForest)
+model = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
+
+# check if all values are predicted (no NA's)
+sum(is.na(model$predicted))
+
+# confusion matrix
+model$confusion
+
+# Error on the training set
+err.train <- mean(as.vector(model$predicted) != as.vector(y_train))*100
+cat(sprintf("Train error: %f", err.train))
+
+# predict from test set
+predictions <- predict(model, newdata = X_test)
+
+# error on the test set
+err.test <- mean(predictions != y_test)*100
+cat(sprintf("Test error: %f", err.test))
+```
