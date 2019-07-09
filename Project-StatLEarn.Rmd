@@ -23,11 +23,11 @@ TODO:  Copy from the milestone...
 **Loading all the csv files as separated dataframes**
 
 ```{r}
-Ivana.df <- read.csv('data_files/Ivana_2walk-Samsung Recording 1-cropped')
-Francesco.df <- read.csv('data_files/Francesco_2walk-Samsung Recording 2-cropped')
-Michele.df <- read.csv('data_files/Michele_2walk-Samsung Recording 2-cropped')
-Francisca.df <- read.csv('data_files/Francisca_2walk-Samsung Recording 1-cropped')
-Joanna.df <- read.csv('data_files/Asia_2walk-Samsung Recording 1-cropped')
+Ivana.df <- read.csv('data_files/Ivana_2walk-Samsung Recording 1-cropped.csv')
+Francesco.df <- read.csv('data_files/Francesco_2walk-Samsung Recording 2-cropped.csv')
+Michele.df <- read.csv('data_files/Michele_2walk-Samsung Recording 2-cropped.csv')
+Francisca.df <- read.csv('data_files/Francisca_2walk-Samsung Recording 1-cropped.csv')
+Joanna.df <- read.csv('data_files/Asia_2walk-Samsung Recording 1-cropped.csv')
 ```
 
 **Omitting ALL NULL values in each data frame**
@@ -263,6 +263,10 @@ y_test <- X_test$person_ID
 X_test$person_ID <- NULL
 ```
 
+## Model elicitation
+
+### Candidate 1: Random Forest
+
 Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
 
 ```{r}
@@ -285,4 +289,27 @@ predictions <- predict(model, newdata = X_test)
 # error on the test set
 err.test <- mean(predictions != y_test)*100
 cat(sprintf("Test error: %f", err.test))
+```
+
+## Candidate 2: Support Vector Machine 
+
+```{r}
+library(e1071)
+dat = data.frame(X_train, y_train = as.factor(y_train))
+model_svm = svm(y_train ~ ., data = dat, kernel = "linear")
+summary(model_svm)
+
+# Predict from test set
+y_pred_svm <- predict(model_svm, newdata = X_test) 
+
+# Check if all values are predicted (no NA's)
+sum(is.na(y_pred_svm))
+
+# Confusion matrix
+
+
+# Error on the training set
+
+# Error on the test set
+
 ```
