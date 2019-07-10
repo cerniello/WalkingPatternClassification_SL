@@ -2,7 +2,8 @@
 title: "Project - Statistical Learning"
 author: "Francesco, Francisca, Ivana, Joanna, Michele,"
 date: "July 5, 2019"
-output: html_document
+output:
+  html_document: default
 ---
 # Introduction
 
@@ -273,22 +274,23 @@ Proceeding with our super mega giga iper deeep machine Classificat networks neur
 suppressMessages(require(randomForest, quietly = T))
 library(randomForest)
 
-model = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
+# Model
+model_RF = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
 
-# check if all values are predicted (no NA's)
-sum(is.na(model$predicted))
+# Check if all values are predicted (no NA's)
+sum(is.na(model_RF$predicted))
 
-# confusion matrix
-model$confusion
+# Confusion matrix
+model_RF$confusion
 
 # Error on the training set
-err.train <- mean(as.vector(model$predicted) != as.vector(y_train))*100
+err.train <- mean(as.vector(model_RF$predicted) != as.vector(y_train))*100
 cat(sprintf("Train error: %f", round(err.train,2)))
 
-# predict from test set
-predictions <- predict(model, newdata = X_test)
+# Predict from test set
+predictions <- predict(model_RF, newdata = X_test)
 
-# error on the test set
+# Error on the test set
 err.test <- mean(predictions != y_test)*100
 cat(sprintf("Test error: %f", round(err.test,2)))
 ```
@@ -299,78 +301,54 @@ cat(sprintf("Test error: %f", round(err.test,2)))
 suppressMessages(require(caret, quietly = T))
 library(MASS)
 
-# Fit the LDA model
+# Model
 mod_LDA = lda(y_train ~ ., data = X_train)
 
+# Check if all values are predicted (no NA's)
+sum(is.na(mod_LDA$predicted))
 
-# Prediction error on test
+# Prediction 
 pred_LDA = predict(mod_LDA, X_test)
-
-# Missclassification error on test
-MCE_LDA = mean(pred_LDA$class != y_test)*100
-round(MCE_LDA,2)
 
 # Confusion matrix
 table(pred_LDA$class, y_test)
 
-# Presition recall F1?
-# Accuracy?
-# ROC?
+# Error on the training set
+ETr_LDA = mean(as.vector(pred_LDA$class) != as.vector(y_test))*100
+round(ETr_LDA,2)
+
+# Error on the test set
+ETe_LDA <- mean(pred_LDA$class != y_test)*100
+cat(sprintf("Test error: %f", round(ETe_LDA,2)))
 ```
 
 ### Naive Bayes (parametric)
 
 ```{r}
 suppressMessages(require(e1071, quietly = T))
-library(help = e1071)
+library(e1071)
 
+# Model
 mod_NB = naiveBayes(y_train ~ ., data = X_train, type = "raw")
 
-pred_NB = predict(mod_NB, X_test)   # strangely takes a long time
-head(pred_NB)
+# Check if all values are predicted (no NA's)
+sum(is.na(mod_NB$predicted)) 
 
-# Missclassification error on test
-MCE_NB = mean(pred_NB !=  y_test)*100
-round(MCE_NB,2)
+# Predictions
+pred_NB = predict(mod_NB, X_test)   
 
 # Confusion Matrix
-#confusionMatrix(as.vector(pred_NB$class), y_test)
+caret::confusionMatrix(as.factor(pred_NB), as.factor(y_test))
+
+# Error on the training set
+ETr_NB = mean(as.vector(pred_NB) != as.vector(y_test))*100
+round(ETr_NB,2)
+
+# Error on the test
+MCE_NB = mean(pred_NB !=  y_test)*100
+round(MCE_NB,2)
 ```
 
-### Multiclass Logistic
-
-```{r}
-suppressWarnings(require(viridis, quietly = T))
-suppressWarnings(require(nnet, quietly = T))   # multiclass-logistic
-
-# Fit the model
-mod_ML = multinom(y_train ~ ., data = X_train) # why class 1 is missing?! D:
-
-
-## JUST IF WE WANT TO CHOOSE SOME VAR
-# coeff's and their standard errors
-round(t(coef(mod_ML)),2)
-
-# 2-tailed z test
-z <- summary(mod_ML)$coefficients/summary(mod_ML)$standard.errors
-head(round(z,2))
-
-# Drop the intercept and plot the log(|z|)
-lz = t(log(abs(z[,-1])))
-
-# The test
-p <- (1 - pnorm(abs(z), 0, 1))*2
-round(t(p),2)
-t.res = t(p < 0.05)
-t.res
-
-# Predict on test
-pred_ML = predict(mod_ML, X_test)
-head(pred_ML)
-
-# Missclassification error on test
-round(mean(pred_ML != y_test)*100,2)
-```
 
 ### LASSO Logistic Regression
 
@@ -394,8 +372,8 @@ log(c("min" = mod_LLR1$lambda.min , "1se" = mod_LLR1$lambda.1se))
 log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
 
 # Now plot (optimal around 5-7 variables!)
-par(mfrow = c(1,2))
-plot(mod_LLR1)
-plot(mod_LLR2)
-# work in progress
+#par(mfrow = c(1,2))
+#plot(mod_LLR1)
+#plot(mod_LLR2)
+# I DO NOT HOW TO PROCEED D:
 ```
