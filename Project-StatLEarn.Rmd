@@ -265,12 +265,14 @@ X_test$person_ID <- NULL
 
 ## Model elicitation
 
-### Candidate 1: Random Forest
+### Random Forest
 
 Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
 
 ```{r}
+suppressMessages(require(randomForest, quietly = T))
 library(randomForest)
+
 model = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
 
 # check if all values are predicted (no NA's)
@@ -281,35 +283,119 @@ model$confusion
 
 # Error on the training set
 err.train <- mean(as.vector(model$predicted) != as.vector(y_train))*100
-cat(sprintf("Train error: %f", err.train))
+cat(sprintf("Train error: %f", round(err.train,2)))
 
 # predict from test set
 predictions <- predict(model, newdata = X_test)
 
 # error on the test set
 err.test <- mean(predictions != y_test)*100
-cat(sprintf("Test error: %f", err.test))
+cat(sprintf("Test error: %f", round(err.test,2)))
 ```
 
-## Candidate 2: Support Vector Machine 
+### LDA
 
 ```{r}
-library(e1071)
-dat = data.frame(X_train, y_train = as.factor(y_train))
-model_svm = svm(y_train ~ ., data = dat, kernel = "linear")
-summary(model_svm)
+suppressMessages(require(caret, quietly = T))
+library(MASS)
 
-# Predict from test set
-y_pred_svm <- predict(model_svm, newdata = X_test) 
+# Fit the LDA model
+mod_LDA = lda(y_train ~ ., data = X_train)
 
-# Check if all values are predicted (no NA's)
-sum(is.na(y_pred_svm))
+
+# Prediction error on test
+pred_LDA = predict(mod_LDA, X_test)
+
+# Missclassification error on test
+MCE_LDA = mean(pred_LDA$class != y_test)*100
+round(MCE_LDA,2)
 
 # Confusion matrix
+table(pred_LDA$class, y_test)
+
+# Presition recall F1?
+# Accuracy?
+# ROC?
+```
+
+### Naive Bayes (parametric)
+
+```{r}
+suppressMessages(require(e1071, quietly = T))
+library(help = e1071)
+
+mod_NB = naiveBayes(y_train ~ ., data = X_train, type = "raw")
+
+pred_NB = predict(mod_NB, X_test)   # strangely takes a long time
+head(pred_NB)
+
+# Missclassification error on test
+MCE_NB = mean(pred_NB !=  y_test)*100
+round(MCE_NB,2)
+
+# Confusion Matrix
+#confusionMatrix(as.vector(pred_NB$class), y_test)
+```
+
+### Multiclass Logistic
+
+```{r}
+suppressWarnings(require(viridis, quietly = T))
+suppressWarnings(require(nnet, quietly = T))   # multiclass-logistic
+
+# Fit the model
+mod_ML = multinom(y_train ~ ., data = X_train) # why class 1 is missing?! D:
 
 
-# Error on the training set
+## JUST IF WE WANT TO CHOOSE SOME VAR
+# coeff's and their standard errors
+round(t(coef(mod_ML)),2)
 
-# Error on the test set
+# 2-tailed z test
+z <- summary(mod_ML)$coefficients/summary(mod_ML)$standard.errors
+head(round(z,2))
 
+# Drop the intercept and plot the log(|z|)
+lz = t(log(abs(z[,-1])))
+
+# The test
+p <- (1 - pnorm(abs(z), 0, 1))*2
+round(t(p),2)
+t.res = t(p < 0.05)
+t.res
+
+# Predict on test
+pred_ML = predict(mod_ML, X_test)
+head(pred_ML)
+
+# Missclassification error on test
+round(mean(pred_ML != y_test)*100,2)
+```
+
+### LASSO Logistic Regression
+
+```{r}
+suppressMessages(require(glmnet, quietly = T)) # l1 penalized-glm 
+#suppressMessages(require(doMC, quietly = T))
+#registerDoMC( cores = detectCores() )
+
+# Deviance
+mod_LLR1 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
+                 type.measure = "deviance",
+                 parallel = T)
+
+# Missclassification
+mod_LLR2 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
+                 type.measure = "class", 
+                 parallel = T)
+
+# Let's take a look at the optimal lambda values (pretty close to each other)
+log(c("min" = mod_LLR1$lambda.min , "1se" = mod_LLR1$lambda.1se))
+log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
+
+# Now plot (optimal around 5-7 variables!)
+par(mfrow = c(1,2))
+plot(mod_LLR1)
+plot(mod_LLR2)
+# work in progress
 ```
