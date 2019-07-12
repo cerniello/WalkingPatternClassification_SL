@@ -24,11 +24,11 @@ TODO:  Copy from the milestone...
 **Loading all the csv files as separated dataframes**
 
 ```{r}
-Ivana.df <- read.csv('data_files/Ivana_2walk-Samsung Recording 1-cropped.csv')
-Francesco.df <- read.csv('data_files/Francesco_2walk-Samsung Recording 2-cropped.csv')
-Michele.df <- read.csv('data_files/Michele_2walk-Samsung Recording 2-cropped.csv')
-Francisca.df <- read.csv('data_files/Francisca_2walk-Samsung Recording 1-cropped.csv')
-Joanna.df <- read.csv('data_files/Asia_2walk-Samsung Recording 1-cropped.csv')
+Ivana.df <- read.csv('Ivana_2walk-Samsung Recording 1-cropped.csv')
+Francesco.df <- read.csv('Francesco_2walk-Samsung Recording 2-cropped.csv')
+Michele.df <- read.csv('Michele_2walk-Samsung Recording 2-cropped.csv')
+Francisca.df <- read.csv('Francisca_2walk-Samsung Recording 1-cropped.csv')
+Joanna.df <- read.csv('Asia_2walk-Samsung Recording 1-cropped.csv')
 ```
 
 **Omitting ALL NULL values in each data frame**
@@ -132,7 +132,7 @@ slicer <- function(df, window.size=200, overlap = 100){
 
 Now, we are checking the possible number of bins generated under specific parameters.
 
-```{r}
+```{r, slicer, cache=TRUE}
 ## Numbers of possible bins with specific window.size and overlap
 window.size = 200
 overlap = 100
@@ -205,74 +205,136 @@ build.features <- function(df, bins, person_ID){
 
 Datframe with features + (AccX, AccY, AccZ, AccLin) average behaviour of Francesco's walk.
 
-```{r}
+```{r, features, cache=TRUE}
 Francesco.feature.df <- build.features(Francesco.df, Francesco.bins, person_ID = 1)
 Francisca.feature.df <- build.features(Francisca.df, Francisca.bins, person_ID = 2)
 Ivana.feature.df <- build.features(Ivana.df, Ivana.bins, person_ID = 3)
 Joanna.feature.df <- build.features(Joanna.df, Joanna.bins, person_ID = 4)
 Michele.feature.df <- build.features(Michele.df, Michele.bins, person_ID = 5)
-
-# example with Francesco's walk
-Francesco.feature.df[1:4, ]
-
-# plotting main features (AccX, AccY, AccZ, LinAcc) of Ivana's walk
-plot(Francesco.feature.df$meanAccX, col = "blue", ylim = c(-13,18), type = "l",
-     ylab = "")
-points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccY, 
-       type = "l", col = "red")
-points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccZ,
-       type = "l", col = "green")
-points(x=1:nrow(Francesco.feature.df), y = Francesco.feature.df$meanAccLin,
-       type = "l", col = "orange")
-title("main features of (only) Francesco's walk pattern")
-legend("bottomleft", legend=c("avg(AccX)", 'avg(AccY)', 'avg(AccZ)', 'avg(AccLin)'),
-       col = c("blue", 'red', "green", 'orange'), lwd = c(1,1,1,1), bty = "n")
 ```
 
-Merging the dataframe: 
+
+The **plot.features** function is in charge of plotting main four features: AccX, AccY, AccZ and LinAcc.
 
 ```{r}
-walks.df <- rbind(Francesco.feature.df, Francisca.feature.df,
-                  Ivana.feature.df, Joanna.feature.df, Michele.feature.df)
+# function that plots main features (AccX, AccY, AccZ, LinAcc)
+plot.features <- function(feature.df, person){
+  plot(feature.df$meanAccX, col = "blue", ylim = c(-13,18), type = "l",
+       ylab = "")
+  points(x=1:nrow(feature.df), y = feature.df$meanAccY, 
+         type = "l", col = "red")
+  points(x=1:nrow(feature.df), y = feature.df$meanAccZ,
+         type = "l", col = "green")
+  points(x=1:nrow(feature.df), y = feature.df$meanAccLin,
+         type = "l", col = "orange")
+  title(paste0("Main features of ", person, "`s walking pattern"))
+  legend("bottomleft", legend=c("avg(AccX)", 'avg(AccY)', 'avg(AccZ)', 'avg(AccLin)'),
+         col = c("blue", 'red', "green", 'orange'), lwd = c(1,1,1,1), bty = "n")
+}
+```
 
-nrow(walks.df)
+```{r}
+plot.features(Francesco.feature.df, "Francesco")
+plot.features(Francisca.feature.df, "Francisca")
+plot.features(Ivana.feature.df, "Ivana")
+plot.features(Joanna.feature.df, "Joanna")
+plot.features(Michele.feature.df, "Michele")
+```
+
+-------------------------------------
+
+**Merging all dataframes **
+
+```{r}
+walks.df <- rbind(Francesco.feature.df, 
+                  Francisca.feature.df,
+                  Ivana.feature.df, 
+                  Joanna.feature.df, 
+                  Michele.feature.df)
+# removing NANs
 walks.df <- na.omit(walks.df)
-nrow(walks.df)
 # reindex
 rownames(walks.df) <- NULL
-
+# show first rows 
 head(walks.df)
 ```
 
-Splitting dataframe in training and test sets using **createDataPartition** function. We put 80% of the data to training set.
+--------------------------------
+
+**Check the correlation**
+
+```{r correlation, cache=TRUE}
+suppressMessages(require(corrplot, quietly = T))
+
+cor.df = cor(walks.df[,-1])
+corrplot(cor.df, method="number", tl.cex = 0.9, number.cex = 0.5, bg = "gray", addgrid.col = "black")
+
+```
+-------------------------------
+
+
+**The fraction of rows per label**
 
 ```{r}
-# createDataPartition split data in function of ``person_ID´´ feature
+prop.table(table(walks.df$person_ID))
+```
+
+---------------------------------------------------
+
+#### **Splitting data**
+
+Splitting dataframe in training and test sets using the **createDataPartition** function. We put 80% of the data to training set.
+
+```{r}
 set.seed(13401)
 
 # idx for the training set
 idx.train <- caret::createDataPartition(walks.df$person_ID, p = 0.8, list = FALSE)
 
-# making X_train and y_train sets
+# creating X_train and y_train sets
 X_train <- walks.df[idx.train, ]
 y_train <- as.factor(X_train$person_ID)
 X_train$person_ID <- NULL
 
-# making test set
+# creating test set
 X_test <- walks.df[-idx.train, ]
 y_test <- X_test$person_ID
 X_test$person_ID <- NULL
 ```
 
+-----------------------------
+
 ## Model elicitation
+
+1. Selected model
+2. 10 fold Cross validation
+3. predictions
+4. Confusion Matrix
+5. Evaluation of classifier: Accuracy, Error rate etc.
+
+We are dealing with a multi-class classification. 
+Used algorithms:
+
+* Random Forest
+
+* Linear Discriminant Analysis
+
+* Naive Bayes (parametric)
+
+* LASSO Logistic Regression
+
+* k-nearest neighbours   #TODO
+
+* Decision Trees   #TODO
+
+* SVM   #TODO
 
 ### Random Forest
 
 Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
 
-```{r}
+```{r, randomForest, cache=TRUE}
 suppressMessages(require(randomForest, quietly = T))
-library(randomForest)
 
 # Model
 model_RF = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
@@ -297,7 +359,7 @@ cat(sprintf("Test error: %f", round(err.test,2)))
 
 ### LDA
 
-```{r}
+```{r, lda, cache=TRUE}
 suppressMessages(require(caret, quietly = T))
 library(MASS)
 
@@ -324,7 +386,7 @@ cat(sprintf("Test error: %f", round(ETe_LDA,2)))
 
 ### Naive Bayes (parametric)
 
-```{r}
+```{r, naiveBayes, cache=TRUE}
 suppressMessages(require(e1071, quietly = T))
 library(e1071)
 
@@ -352,7 +414,7 @@ round(MCE_NB,2)
 
 ### LASSO Logistic Regression
 
-```{r}
+```{r, lasso, cache=TRUE}
 suppressMessages(require(glmnet, quietly = T)) # l1 penalized-glm 
 #suppressMessages(require(doMC, quietly = T))
 #registerDoMC( cores = detectCores() )
