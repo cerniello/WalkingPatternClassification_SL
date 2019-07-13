@@ -14,10 +14,9 @@ TODO:  Copy from the milestone...
 
 suppressMessages(require(randomForest, quietly = T))
 suppressMessages(require(caret, quietly = T))
-library(MASS)
+suppressMessages(require(MASS, quietly = T))
 suppressMessages(require(e1071, quietly = T))
-
-
+suppressMessages(require(doParallel, quietly = T))
 
 ```
 -------------------------------------------------------------------
@@ -331,14 +330,28 @@ Used algorithms:
 
 * Naive Bayes (parametric)
 
-* LASSO Logistic Regression
+* LASSO Logistic Regression  #TODO - not finished 
 
-* k-nearest neighbours   #TODO
+* QDA   #TODO ?
+
+* k-nearest neighbours   #TODO - done 
 
 * Decision Trees   #TODO
 
 * SVM   #TODO
 
+```{r}
+# function that takes the label according to the highest probability
+get_label <- function(predictions){
+  n = nrow(predictions)
+  pred_labels = rep(NA,n)
+  for(i in 1:n){
+    max.id <- which.max(predictions[i, ])
+    pred_labels[i] <- names(predictions[i, max.id])
+  }
+  return(as.factor(pred_labels))
+}
+```
 
 Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
 
@@ -365,7 +378,7 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the training set
   err.train <- mean(as.vector(model_RF$predicted) != as.vector(y_train))*100
-  cat(sprintf("\nTrain error: %f", round(err.train,2)))
+  cat(sprintf("\nTrain Missclassification rate: %f", round(err.train,2)))
   
   cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
@@ -374,7 +387,7 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the test set
   err.test <- mean(predictions != y_test)*100
-  cat(sprintf("\nTest error: %f \n\n", round(err.test,2)))
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(err.test,2)))
   
   statistics <- confusionMatrix(predictions, y_test)
   print(statistics)
@@ -403,7 +416,7 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the training set
   ETr_LDA = mean(as.vector(tr_pred_LDA$class) != as.vector(y_train))*100
-  cat(sprintf("\nTrain error: %f", round(ETr_LDA,2)))
+  cat(sprintf("\nTrain Missclassification rate: %f", round(ETr_LDA,2)))
   
   cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
@@ -412,7 +425,7 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the test set
   ETe_LDA <- mean(pred_LDA$class != y_test)*100
-  cat(sprintf("\nTest error: %f \n\n", round(ETe_LDA,2)))
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(ETe_LDA,2)))
   
   # Statistics
   statistics <- confusionMatrix(pred_LDA$class, y_test)
@@ -443,7 +456,7 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the training set
   tr.error = mean(as.vector(tr_pred) != as.vector(y_train))*100
-  cat(sprintf("\nTrain error: %f", round(tr.error,2)))
+  cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
   
   cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
@@ -452,7 +465,7 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Error on the test set
   MCE_NB = mean(pred_NB !=  y_test)*100
-  cat(sprintf("\nTest error: %f \n\n", round(MCE_NB,2)))
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(MCE_NB,2)))
   
   # Statistics
   statistics <- confusionMatrix(pred_NB, y_test)
@@ -464,27 +477,94 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
 naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
+### k-Nearest Neighbor
+
+Cross validation in order to get the best k.
+
+```{r knnCV , cache=TRUE}
+set.seed(123)
+registerDoParallel(cores=4)
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 2)
+
+knn_fit <- train(y = y_train ,
+                 x = X_train, method = "knn",
+                 trControl  = trctrl,
+                 preProcess = c("center", "scale"),
+                 tuneLength = 10)
+# Take a look
+print(paste("Best parameter:", as.character(knn_fit$bestTune)))
+plot(knn_fit)
+```
+
+Using Cross Validation method as the best parameter we received k=7.
+
+```{r knnPred, cache=TRUE}
+knn.fit.predict <- function(X_train, y_train, X_test, y_test){
+  # Model
+  mod_KNN = knn3(y=y_train, x = X_train, k = 7)
+  
+  # Prediction on train set
+  tr_pred = predict(mod_KNN, X_train)
+  main_tr_pred = get_label(tr_pred)
+
+  # Check if all values are predicted (no NA's)
+  ifelse(sum(is.na(main_tr_pred)) != 0, 
+         ok <- "There are NAN values in predictions", 
+         ok <- "All predictions evaluated")
+  print(ok)
+  
+  # Error on the training set
+  tr.error = mean(as.vector(main_tr_pred) != as.vector(y_train))*100
+  cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Prediction on test set
+  pred_KNN = predict(mod_KNN, X_test)
+  main_pred_KNN = get_label(pred_KNN)
+
+  # Error on the test set
+  te.error = mean(main_pred_KNN !=  y_test)*100
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(te.error,2)))
+
+  # Statistics
+  statistics <- confusionMatrix(main_pred_KNN, y_test)
+  print(statistics)
+  
+  return(predictions)
+}
+
+knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
+```
+
 
 ### LASSO Logistic Regression
 
 ```{r, lasso, cache=TRUE}
 suppressMessages(require(glmnet, quietly = T)) # l1 penalized-glm 
-#suppressMessages(require(doMC, quietly = T))
-#registerDoMC( cores = detectCores() )
 
-# Deviance
-mod_LLR1 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
-                 type.measure = "deviance",
-                 parallel = T)
+mod_LASSO = cv.glmnet(as.matrix(X_train), y_train, 
+                      family = "multinomial", 
+                      type.measure = "class",
+                      parallel = T)
+print(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se))
 
-# Missclassification
-mod_LLR2 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
-                 type.measure = "class", 
-                 parallel = T)
+pred_LASSO = predict(mod_LASSO, newx = as.matrix(X_train), type = "class", s = mod_LASSO$lambda.1se)
 
-# Let's take a look at the optimal lambda values (pretty close to each other)
-log(c("min" = mod_LLR1$lambda.min , "1se" = mod_LLR1$lambda.1se))
-log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
+
+# # Deviance
+# mod_LLR1 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
+#                  type.measure = "deviance",
+#                  parallel = T)
+# 
+# # Missclassification
+# mod_LLR2 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
+#                  type.measure = "class", 
+#                  parallel = T)
+# 
+# # Let's take a look at the optimal lambda values (pretty close to each other)
+# log(c("min" = mod_LLR1$lambda.min , "1se" = mod_LLR1$lambda.1se))
+# log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
 
 # Now plot (optimal around 5-7 variables!)
 #par(mfrow = c(1,2))
@@ -493,7 +573,31 @@ log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
 # I DO NOT HOW TO PROCEED D:
 ```
 
+```{r LASSO}
+mod_LASSO = cv.glmnet(as.matrix(data.tr[,-1]), data.tr[,1], family = "multinomial", 
+                      type.measure = "class",
+                      parallel = T)
 
+print(log(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se)))
 
+# With lambda that minimize error
+pred_LASSOa = predict(mod_LASSO, newx = as.matrix(data.te[,-1]), type = "class", s = mod_LASSO$lambda.1se)
+# See results
+final_pred_Lassoa <- get_majority(pred_LASSOa,len_seqs.te)
+print(paste("Accuracy", as.character(100-mean(final_pred_Lassoa != right_label)*100)))
+table(final_pred_Lassoa, right_label)
 
- #Additional model: we can choose the best models and build a new classifier based on them. For example: the prediction will be equa to the value that is predicted by majority of them.
+# With lambda that minimize 1se
+pred_LASSOb = predict(mod_LASSO, newx = as.matrix(data.te[,-1]), type = "class", s = mod_LASSO$lambda.min)
+# See results
+final_pred_Lassob <- get_majority(pred_LASSOb,len_seqs.te)
+print(paste("Accuracy", as.character(100-mean(final_pred_Lassob != right_label)*100)))
+table(final_pred_Lassob, right_label)
+```
+
+#### Summary of algorithms results:
+
+ #TODO : build table with accuracies of all methods for easier comaprison
+ 
+
+ #Additional model: we can choose the best models and build a new classifier based on them. For example: the prediction will be equal to the value that is predicted by majority of them.
