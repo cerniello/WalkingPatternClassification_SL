@@ -9,7 +9,17 @@ output:
 
 TODO:  Copy from the milestone...
 
+```{r}
+# Libraries
 
+suppressMessages(require(randomForest, quietly = T))
+suppressMessages(require(caret, quietly = T))
+library(MASS)
+suppressMessages(require(e1071, quietly = T))
+
+
+
+```
 -------------------------------------------------------------------
 
 ## Data Pre-processing
@@ -298,7 +308,7 @@ X_train$person_ID <- NULL
 
 # creating test set
 X_test <- walks.df[-idx.train, ]
-y_test <- X_test$person_ID
+y_test <- as.factor(X_test$person_ID)
 X_test$person_ID <- NULL
 ```
 
@@ -329,86 +339,129 @@ Used algorithms:
 
 * SVM   #TODO
 
-### Random Forest
 
 Proceeding with our super mega giga iper deeep machine Classificat networks neural Bayesian  SKLearning sckit pyplot matplotlib
 
+### Random Forest
+
 ```{r, randomForest, cache=TRUE}
-suppressMessages(require(randomForest, quietly = T))
 
-# Model
-model_RF = randomForest(x = X_train, y = y_train, ntree=101, proximity=T)
+randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){ 
+  # Model on training data
+  model_RF = randomForest(x = X_train, y = y_train, ntree=200, proximity=T)
+  
+  # Check if all values are predicted (no NA's)
+  ifelse(sum(is.na(model_RF$predicted)) != 0, 
+         ok <- "There are NAN values in predictions", 
+         ok <- "All predictions evaluated")
+  print(ok)
+  
+  # Confusion matrix of the prediction (based on OOB data)
+  cat("\nConfusion matrix of the prediction (based on OOB data) : \n")
+  print(model_RF$confusion)
+  
+  ## Error rate based on OOB
+  # model_RF$err.rate
+  
+  # Error on the training set
+  err.train <- mean(as.vector(model_RF$predicted) != as.vector(y_train))*100
+  cat(sprintf("\nTrain error: %f", round(err.train,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Predict from test set
+  predictions <- predict(model_RF, newdata = X_test)
+  
+  # Error on the test set
+  err.test <- mean(predictions != y_test)*100
+  cat(sprintf("\nTest error: %f \n\n", round(err.test,2)))
+  
+  statistics <- confusionMatrix(predictions, y_test)
+  print(statistics)
+  return(predictions)
+}  
 
-# Check if all values are predicted (no NA's)
-sum(is.na(model_RF$predicted))
-
-# Confusion matrix
-model_RF$confusion
-
-# Error on the training set
-err.train <- mean(as.vector(model_RF$predicted) != as.vector(y_train))*100
-cat(sprintf("Train error: %f", round(err.train,2)))
-
-# Predict from test set
-predictions <- predict(model_RF, newdata = X_test)
-
-# Error on the test set
-err.test <- mean(predictions != y_test)*100
-cat(sprintf("Test error: %f", round(err.test,2)))
+RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### LDA
 
 ```{r, lda, cache=TRUE}
-suppressMessages(require(caret, quietly = T))
-library(MASS)
 
-# Model
-mod_LDA = lda(y_train ~ ., data = X_train)
+lda.fit.predict <- function(X_train, y_train, X_test, y_test){
+  # Model
+  mod_LDA = lda(y_train ~ ., data = X_train)
+  
+  # Prediction on train set
+  tr_pred_LDA = predict(mod_LDA, X_train)
+  
+  # Check if all values are predicted (no NA's)
+  ifelse(sum(is.na(tr_pred_LDA$class)) != 0, 
+         ok <- "There are NAN values in predictions", 
+         ok <- "All predictions evaluated")
+  print(ok)
+  
+  # Error on the training set
+  ETr_LDA = mean(as.vector(tr_pred_LDA$class) != as.vector(y_train))*100
+  cat(sprintf("\nTrain error: %f", round(ETr_LDA,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Prediction on test set
+  pred_LDA = predict(mod_LDA, X_test)
+  
+  # Error on the test set
+  ETe_LDA <- mean(pred_LDA$class != y_test)*100
+  cat(sprintf("\nTest error: %f \n\n", round(ETe_LDA,2)))
+  
+  # Statistics
+  statistics <- confusionMatrix(pred_LDA$class, y_test)
+  print(statistics)
+  
+  return(predictions)
+}
 
-# Check if all values are predicted (no NA's)
-sum(is.na(mod_LDA$predicted))
-
-# Prediction 
-pred_LDA = predict(mod_LDA, X_test)
-
-# Confusion matrix
-table(pred_LDA$class, y_test)
-
-# Error on the training set
-ETr_LDA = mean(as.vector(pred_LDA$class) != as.vector(y_test))*100
-round(ETr_LDA,2)
-
-# Error on the test set
-ETe_LDA <- mean(pred_LDA$class != y_test)*100
-cat(sprintf("Test error: %f", round(ETe_LDA,2)))
+lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### Naive Bayes (parametric)
 
 ```{r, naiveBayes, cache=TRUE}
-suppressMessages(require(e1071, quietly = T))
-library(e1071)
 
-# Model
-mod_NB = naiveBayes(y_train ~ ., data = X_train, type = "raw")
+naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
+  # Model
+  mod_NB = naiveBayes(y_train ~ ., data = X_train, type = "raw")
+  
+  # Prediction on train set
+  tr_pred = predict(mod_NB, X_train)
 
-# Check if all values are predicted (no NA's)
-sum(is.na(mod_NB$predicted)) 
+  # Check if all values are predicted (no NA's)
+  ifelse(sum(is.na(tr_pred)) != 0, 
+         ok <- "There are NAN values in predictions", 
+         ok <- "All predictions evaluated")
+  print(ok)
+  
+  # Error on the training set
+  tr.error = mean(as.vector(tr_pred) != as.vector(y_train))*100
+  cat(sprintf("\nTrain error: %f", round(tr.error,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Prediction on test set
+  pred_NB = predict(mod_NB, X_test)   
+  
+  # Error on the test set
+  MCE_NB = mean(pred_NB !=  y_test)*100
+  cat(sprintf("\nTest error: %f \n\n", round(MCE_NB,2)))
+  
+  # Statistics
+  statistics <- confusionMatrix(pred_NB, y_test)
+  print(statistics)
+  
+  return(predictions)
+}
 
-# Predictions
-pred_NB = predict(mod_NB, X_test)   
-
-# Confusion Matrix
-caret::confusionMatrix(as.factor(pred_NB), as.factor(y_test))
-
-# Error on the training set
-ETr_NB = mean(as.vector(pred_NB) != as.vector(y_test))*100
-round(ETr_NB,2)
-
-# Error on the test
-MCE_NB = mean(pred_NB !=  y_test)*100
-round(MCE_NB,2)
+naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 
@@ -439,3 +492,8 @@ log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
 #plot(mod_LLR2)
 # I DO NOT HOW TO PROCEED D:
 ```
+
+
+
+
+ #Additional model: we can choose the best models and build a new classifier based on them. For example: the prediction will be equa to the value that is predicted by majority of them.
