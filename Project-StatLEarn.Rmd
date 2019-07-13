@@ -315,12 +315,6 @@ X_test$person_ID <- NULL
 
 ## Model elicitation
 
-1. Selected model
-2. 10 fold Cross validation
-3. predictions
-4. Confusion Matrix
-5. Evaluation of classifier: Accuracy, Error rate etc.
-
 We are dealing with a multi-class classification. 
 Used algorithms:
 
@@ -330,7 +324,7 @@ Used algorithms:
 
 * Naive Bayes (parametric)
 
-* LASSO Logistic Regression  #TODO - not finished 
+* LASSO Logistic Regression  #TODO - done
 
 * QDA   #TODO ?
 
@@ -431,7 +425,7 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   statistics <- confusionMatrix(pred_LDA$class, y_test)
   print(statistics)
   
-  return(predictions)
+  return(pred_LDA)
 }
 
 lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
@@ -471,7 +465,7 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   statistics <- confusionMatrix(pred_NB, y_test)
   print(statistics)
   
-  return(predictions)
+  return(pred_NB)
 }
 
 naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
@@ -531,7 +525,7 @@ knn.fit.predict <- function(X_train, y_train, X_test, y_test){
   statistics <- confusionMatrix(main_pred_KNN, y_test)
   print(statistics)
   
-  return(predictions)
+  return(main_pred_KNN)
 }
 
 knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
@@ -541,59 +535,46 @@ knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
 ### LASSO Logistic Regression
 
 ```{r, lasso, cache=TRUE}
-suppressMessages(require(glmnet, quietly = T)) # l1 penalized-glm 
+suppressMessages(require(glmnet, quietly = T))
 
-mod_LASSO = cv.glmnet(as.matrix(X_train), y_train, 
-                      family = "multinomial", 
-                      type.measure = "class",
-                      parallel = T)
-print(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se))
+lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
+  mod_LASSO = cv.glmnet(as.matrix(X_train), y_train, 
+                        family = "multinomial", 
+                        type.measure = "class",
+                        parallel = T)
+  print(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se))
+  
+  pred_tr_LASSO = predict(mod_LASSO, newx = as.matrix(X_train), 
+                          type = "class", 
+                          s = mod_LASSO$lambda.1se)
 
-pred_LASSO = predict(mod_LASSO, newx = as.matrix(X_train), type = "class", s = mod_LASSO$lambda.1se)
+  # Error on the training set
+  tr.error = mean(as.vector(pred_tr_LASSO) != as.vector(y_train))*100
+  cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Prediction on test set
+  pred_LASSO = predict(mod_LASSO, newx = as.matrix(X_test), type = "class", s = mod_LASSO$lambda.1se)
+  test_pred_LASSO = as.factor(pred_LASSO)
 
+  # Error on the test set
+  te.error = mean(test_pred_LASSO !=  y_test)*100
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(te.error,2)))
 
-# # Deviance
-# mod_LLR1 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
-#                  type.measure = "deviance",
-#                  parallel = T)
-# 
-# # Missclassification
-# mod_LLR2 = cv.glmnet(as.matrix(X_train), y_train, family = "multinomial", 
-#                  type.measure = "class", 
-#                  parallel = T)
-# 
-# # Let's take a look at the optimal lambda values (pretty close to each other)
-# log(c("min" = mod_LLR1$lambda.min , "1se" = mod_LLR1$lambda.1se))
-# log(c("min" = mod_LLR2$lambda.min, "1se" = mod_LLR2$lambda.1se))
+  # Statistics
+  statistics <- confusionMatrix(test_pred_LASSO, y_test)
+  print(statistics)
+  
+  return(test_pred_LASSO)
+}
 
-# Now plot (optimal around 5-7 variables!)
-#par(mfrow = c(1,2))
-#plot(mod_LLR1)
-#plot(mod_LLR2)
-# I DO NOT HOW TO PROCEED D:
+lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
-```{r LASSO}
-mod_LASSO = cv.glmnet(as.matrix(data.tr[,-1]), data.tr[,1], family = "multinomial", 
-                      type.measure = "class",
-                      parallel = T)
+### Decision Trees
+### SVM
 
-print(log(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se)))
-
-# With lambda that minimize error
-pred_LASSOa = predict(mod_LASSO, newx = as.matrix(data.te[,-1]), type = "class", s = mod_LASSO$lambda.1se)
-# See results
-final_pred_Lassoa <- get_majority(pred_LASSOa,len_seqs.te)
-print(paste("Accuracy", as.character(100-mean(final_pred_Lassoa != right_label)*100)))
-table(final_pred_Lassoa, right_label)
-
-# With lambda that minimize 1se
-pred_LASSOb = predict(mod_LASSO, newx = as.matrix(data.te[,-1]), type = "class", s = mod_LASSO$lambda.min)
-# See results
-final_pred_Lassob <- get_majority(pred_LASSOb,len_seqs.te)
-print(paste("Accuracy", as.character(100-mean(final_pred_Lassob != right_label)*100)))
-table(final_pred_Lassob, right_label)
-```
 
 #### Summary of algorithms results:
 
