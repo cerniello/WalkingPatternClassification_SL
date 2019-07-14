@@ -9,15 +9,14 @@ output:
 
 TODO:  Copy from the milestone...
 
-```{r}
-# Libraries
-
+```{r lib}
 suppressMessages(require(randomForest, quietly = T))
 suppressMessages(require(caret, quietly = T))
 suppressMessages(require(MASS, quietly = T))
 suppressMessages(require(e1071, quietly = T))
 suppressMessages(require(doParallel, quietly = T))
-
+suppressMessages(require(corrplot, quietly = T))
+suppressMessages(require(glmnet, quietly = T))
 ```
 -------------------------------------------------------------------
 
@@ -32,7 +31,7 @@ suppressMessages(require(doParallel, quietly = T))
 
 **Loading all the csv files as separated dataframes**
 
-```{r}
+```{r dataframes}
 Ivana.df <- read.csv('Ivana_2walk-Samsung Recording 1-cropped.csv')
 Francesco.df <- read.csv('Francesco_2walk-Samsung Recording 2-cropped.csv')
 Michele.df <- read.csv('Michele_2walk-Samsung Recording 2-cropped.csv')
@@ -173,9 +172,9 @@ Ivana.df[Ivana.bins[[1]], ]
 absolute_diff <- function(xx){
   ## calculated only for rows without NANs
   xx <- na.omit(xx)
-  return((1/length(xx)) * sum(abs(xx - mean(xx))))
-}
+  return((1/length(xx)) * sum(abs(xx - mean(xx))))}
 ```
+
 
 
 The **build.features** function takes as an input dataframe and bins for that dataframe and generates a dataframe with features.
@@ -209,8 +208,8 @@ build.features <- function(df, bins, person_ID){
                          'meanAccLin', 'person_ID')
   return(feature.df)
 }
-
 ```
+
 
 Datframe with features + (AccX, AccY, AccZ, AccLin) average behaviour of Francesco's walk.
 
@@ -273,8 +272,6 @@ head(walks.df)
 **Check the correlation**
 
 ```{r correlation, cache=TRUE}
-suppressMessages(require(corrplot, quietly = T))
-
 cor.df = cor(walks.df[,-1])
 corrplot(cor.df, method="number", tl.cex = 0.9, number.cex = 0.5, bg = "gray", addgrid.col = "black")
 
@@ -282,7 +279,7 @@ corrplot(cor.df, method="number", tl.cex = 0.9, number.cex = 0.5, bg = "gray", a
 -------------------------------
 
 
-**The fraction of rows per label**
+**Fractions of rows per label**
 
 ```{r}
 prop.table(table(walks.df$person_ID))
@@ -322,17 +319,17 @@ Used algorithms:
 
 * Linear Discriminant Analysis
 
-* Naive Bayes (parametric)
-
-* LASSO Logistic Regression  #TODO - done
-
 * QDA   #TODO ?
 
-* k-nearest neighbours   #TODO - done 
+* Naive Bayes (parametric)
 
-* Decision Trees   #TODO
+* LASSO Logistic Regression 
 
-* SVM   #TODO
+* k-Nearest Neighbours
+
+* SVM
+
+* Stacking Model from the best 3 models
 
 ```{r}
 # function that takes the label according to the highest probability
@@ -351,8 +348,7 @@ Proceeding with our super mega giga iper deeep machine Classificat networks neur
 
 ### Random Forest
 
-```{r, randomForest, cache=TRUE}
-
+```{r, randomForest}
 randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){ 
   # Model on training data
   model_RF = randomForest(x = X_train, y = y_train, ntree=200, proximity=T)
@@ -393,7 +389,8 @@ RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
 
 ### LDA
 
-```{r, lda, cache=TRUE}
+```
+{r, lda}
 
 lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   # Model
@@ -433,7 +430,8 @@ lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
 
 ### Naive Bayes (parametric)
 
-```{r, naiveBayes, cache=TRUE}
+```
+{r, naiveBayes}
 
 naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   # Model
@@ -475,7 +473,8 @@ naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
 
 Cross validation in order to get the best k.
 
-```{r knnCV , cache=TRUE}
+```
+{r knnCV}
 set.seed(123)
 registerDoParallel(cores=4)
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 2)
@@ -492,10 +491,10 @@ plot(knn_fit)
 
 Using Cross Validation method as the best parameter we received k=7.
 
-```{r knnPred, cache=TRUE}
-knn.fit.predict <- function(X_train, y_train, X_test, y_test){
+```{r knnPred}
+knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=7){
   # Model
-  mod_KNN = knn3(y=y_train, x = X_train, k = 7)
+  mod_KNN = knn3(y=y_train, x = X_train, k)
   
   # Prediction on train set
   tr_pred = predict(mod_KNN, X_train)
@@ -534,8 +533,8 @@ knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
 
 ### LASSO Logistic Regression
 
-```{r, lasso, cache=TRUE}
-suppressMessages(require(glmnet, quietly = T))
+```
+{r, lasso}
 
 lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
   mod_LASSO = cv.glmnet(as.matrix(X_train), y_train, 
@@ -572,13 +571,166 @@ lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
 lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
-### Decision Trees
 ### SVM
+
+```{r svm}
+
+svm.fit.predict <- function(X_train, y_train, X_test, y_test){
+  # Model
+  mod.svm <-svm(x = X_train, y = y_train)
+  
+  # Prediction on train set
+  train.pred <- predict(mod.svm, X_train)
+
+  # Check if all values are predicted (no NA's)
+  ifelse(sum(is.na(train.pred)) != 0, 
+         ok <- "There are NAN values in predictions", 
+         ok <- "All predictions evaluated")
+  print(ok)
+  
+  # Error on the training set
+  tr.error = mean(as.vector(train.pred) != as.vector(y_train))*100
+  cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
+  
+  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  
+  # Prediction on test set
+  pred_svm = predict(mod.svm, X_test)
+
+  # Error on the test set
+  te.error = mean(pred_svm !=  y_test)*100
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(te.error,2)))
+
+  # Statistics
+  statistics <- confusionMatrix(pred_svm, y_test)
+  print(statistics)
+  
+  return(pred_svm)
+}
+
+svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
+```
+
 
 
 #### Summary of algorithms results:
 
+rand.forest.acuracy <- 0.9108 
+lda.accuracy <- 0.7164 
+naive.bayes.accuracy <- 0.6099
+kn.accuracy <- 0.919
+lasso.accuracy <- 0.7266
+svm.accuracy <- 0.88
+
  #TODO : build table with accuracies of all methods for easier comaprison
  
+#### Stacking Model
 
- #Additional model: we can choose the best models and build a new classifier based on them. For example: the prediction will be equal to the value that is predicted by majority of them.
+We built **the stacking model** using the best tree models: k-NN, Random Forest and SVM. 
+The idea is to use the predictions of majority. In a case that each classifier returns different class, we follow using the prediction of the best classifier: k-NN. 
+
+```{r stacking}
+stacking.model <- function(knn.pred, random.forest.pred, svm.pred){
+  # function to get a mode
+  getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+  }
+  # finding predictions from stacking model
+  n <- length(knn.pred)
+  final.pred <- rep(NA, n)
+  # loop through predictions
+  for(i in 1:n){
+    p1 <- knn.pred[i]
+    p2 <- random.forest.pred[i]
+    p3 <- svm.pred[i]
+    if(p1!=p2 & p2!=p3 & p1!=p3) {final.pred[i] = knn.pred[i]}
+    else {final.pred[i] = getmode(c(p1, p2, p3))}
+  }
+  return(final.pred)
+}
+
+stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
+```
+
+
+```{r stacking2}
+stacking.statistics <- function(stacking.pred, y_test){
+  te.error = mean(stacking.pred !=  y_test)*100
+  cat(sprintf("\nTest Missclassification rate: %f \n\n", round(te.error,2)))
+
+  # Statistics
+  statistics <- confusionMatrix(as.factor(stacking.pred), y_test)
+  print(statistics)
+}
+
+stacking.statistics(stacking.pred, y_test)
+```
+
+
+-----------------------------------------------
+
+## Analysis for different bin sizes
+
+## Numbers of possible bins with specific window.size and overlap
+
+```{r}
+
+whole.pipeline <- function(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df){
+  ## Dividing into bins
+  window.size = 500
+  overlap = 200
+
+  Ivana.bins <- slicer(Ivana.df, window.size=window.size, overlap = overlap)
+  cat(paste("Ivana", length(Ivana.bins)))
+  Michele.bins <- slicer(Michele.df, window.size=window.size, overlap = overlap)
+  cat(paste("\nMichele", length(Michele.bins)))
+  Francesco.bins <- slicer(Francesco.df, window.size=window.size, overlap = overlap)
+  cat(paste("\nFrancesco",length(Francesco.bins)))
+  Francisca.bins <- slicer(Francisca.df, window.size=window.size, overlap = overlap)
+  cat(paste("\nFrancisca", length(Francisca.bins)))
+  Joanna.bins <- slicer(Joanna.df, window.size=window.size, overlap = overlap)
+  cat(paste("\nJoanna", length(Joanna.bins)))
+  
+  ## Building feature dataframes
+  Francesco.feature.df <- build.features(Francesco.df, Francesco.bins, person_ID = 1)
+  Francisca.feature.df <- build.features(Francisca.df, Francisca.bins, person_ID = 2)
+  Ivana.feature.df <- build.features(Ivana.df, Ivana.bins, person_ID = 3)
+  Joanna.feature.df <- build.features(Joanna.df, Joanna.bins, person_ID = 4)
+  Michele.feature.df <- build.features(Michele.df, Michele.bins, person_ID = 5)
+  
+  ## Merging into one dataframe
+  walks.df <- rbind(Francesco.feature.df, 
+                  Francisca.feature.df,
+                  Ivana.feature.df, 
+                  Joanna.feature.df, 
+                  Michele.feature.df)
+  walks.df <- na.omit(walks.df)
+  rownames(walks.df) <- NULL # reindex
+  
+  ########     MACHINE LEARNING
+  
+  ## Splitting into Test Set and Train Set
+  idx.train <- caret::createDataPartition(walks.df$person_ID, p = 0.8, list = FALSE)
+  X_train <- walks.df[idx.train, ]
+  y_train <- as.factor(X_train$person_ID)
+  X_train$person_ID <- NULL
+
+  X_test <- walks.df[-idx.train, ]
+  y_test <- as.factor(X_test$person_ID)
+  X_test$person_ID <- NULL
+  
+  ## Models and Predictions
+  RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
+  lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
+  naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
+  lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
+  svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
+  
+  # Stacking model
+  stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
+  stacking.statistics(stacking.pred, y_test)
+}
+
+whole.pipeline(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df)
+```

@@ -9,3 +9,5 @@ Matrix
 foreach
 glmnet
 corrplot
+iterators
+doParallel
