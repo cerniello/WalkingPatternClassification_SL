@@ -9,15 +9,6 @@ output:
 
 TODO:  Copy from the milestone...
 
-```{r lib}
-suppressMessages(require(randomForest, quietly = T))
-suppressMessages(require(caret, quietly = T))
-suppressMessages(require(MASS, quietly = T))
-suppressMessages(require(e1071, quietly = T))
-suppressMessages(require(doParallel, quietly = T))
-suppressMessages(require(corrplot, quietly = T))
-suppressMessages(require(glmnet, quietly = T))
-```
 -------------------------------------------------------------------
 
 ## Data Pre-processing
@@ -32,6 +23,16 @@ suppressMessages(require(glmnet, quietly = T))
 **Loading all the csv files as separated dataframes**
 
 ```{r dataframes}
+## Libraries
+suppressMessages(require(randomForest, quietly = T))
+suppressMessages(require(caret, quietly = T))
+suppressMessages(require(MASS, quietly = T))
+suppressMessages(require(e1071, quietly = T))
+suppressMessages(require(doParallel, quietly = T))
+suppressMessages(require(corrplot, quietly = T))
+suppressMessages(require(glmnet, quietly = T))
+
+
 Ivana.df <- read.csv('Ivana_2walk-Samsung Recording 1-cropped.csv')
 Francesco.df <- read.csv('Francesco_2walk-Samsung Recording 2-cropped.csv')
 Michele.df <- read.csv('Michele_2walk-Samsung Recording 2-cropped.csv')
@@ -349,7 +350,8 @@ Proceeding with our super mega giga iper deeep machine Classificat networks neur
 ### Random Forest
 
 ```{r, randomForest}
-randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){ 
+randomForest.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats = TRUE){ 
+  cat("\n\n\t\t\t RANDOM FOREST algorithm \n\n")
   # Model on training data
   model_RF = randomForest(x = X_train, y = y_train, ntree=200, proximity=T)
   
@@ -357,12 +359,13 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){
   ifelse(sum(is.na(model_RF$predicted)) != 0, 
          ok <- "There are NAN values in predictions", 
          ok <- "All predictions evaluated")
-  print(ok)
+  if(full.stats==TRUE) print(ok)
   
   # Confusion matrix of the prediction (based on OOB data)
+  if(full.stats==TRUE) {
   cat("\nConfusion matrix of the prediction (based on OOB data) : \n")
   print(model_RF$confusion)
-  
+  }
   ## Error rate based on OOB
   # model_RF$err.rate
   
@@ -370,7 +373,7 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){
   err.train <- mean(as.vector(model_RF$predicted) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(err.train,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Predict from test set
   predictions <- predict(model_RF, newdata = X_test)
@@ -380,19 +383,21 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test){
   cat(sprintf("\nTest Missclassification rate: %f \n\n", round(err.test,2)))
   
   statistics <- confusionMatrix(predictions, y_test)
-  print(statistics)
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
+  
   return(predictions)
 }  
 
-RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
+#RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### LDA
 
-```
-{r, lda}
+```{r, lda}
 
-lda.fit.predict <- function(X_train, y_train, X_test, y_test){
+lda.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
+  cat("\n\n\t\t\t LDA - LINEAR DISCRIMINANT ANALYSIS algorithm \n\n")
   # Model
   mod_LDA = lda(y_train ~ ., data = X_train)
   
@@ -403,13 +408,13 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   ifelse(sum(is.na(tr_pred_LDA$class)) != 0, 
          ok <- "There are NAN values in predictions", 
          ok <- "All predictions evaluated")
-  print(ok)
+  if(full.stats==TRUE) print(ok)
   
   # Error on the training set
   ETr_LDA = mean(as.vector(tr_pred_LDA$class) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(ETr_LDA,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Prediction on test set
   pred_LDA = predict(mod_LDA, X_test)
@@ -420,20 +425,22 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Statistics
   statistics <- confusionMatrix(pred_LDA$class, y_test)
-  print(statistics)
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
   
   return(pred_LDA)
 }
 
-lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
+#lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### Naive Bayes (parametric)
 
-```
-{r, naiveBayes}
+```{r, naiveBayes}
 
-naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
+naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
+  cat("\n\n\t\t\t NAIVE BAYES algorithm \n\n")
+  
   # Model
   mod_NB = naiveBayes(y_train ~ ., data = X_train, type = "raw")
   
@@ -444,13 +451,13 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   ifelse(sum(is.na(tr_pred)) != 0, 
          ok <- "There are NAN values in predictions", 
          ok <- "All predictions evaluated")
-  print(ok)
+  if(full.stats==TRUE) print(ok)
   
   # Error on the training set
   tr.error = mean(as.vector(tr_pred) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Prediction on test set
   pred_NB = predict(mod_NB, X_test)   
@@ -461,20 +468,20 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test){
   
   # Statistics
   statistics <- confusionMatrix(pred_NB, y_test)
-  print(statistics)
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
   
   return(pred_NB)
 }
 
-naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
+#naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### k-Nearest Neighbor
 
 Cross validation in order to get the best k.
 
-```
-{r knnCV}
+```{r knnCV}
 set.seed(123)
 registerDoParallel(cores=4)
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 2)
@@ -492,7 +499,9 @@ plot(knn_fit)
 Using Cross Validation method as the best parameter we received k=7.
 
 ```{r knnPred}
-knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=7){
+knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=knn_fit$bestTune, full.stats=TRUE){
+  cat("\n\n\t\t\t k-NEAREST NEIGHBOR algorithm \n\n")
+  
   # Model
   mod_KNN = knn3(y=y_train, x = X_train, k)
   
@@ -504,13 +513,13 @@ knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=7){
   ifelse(sum(is.na(main_tr_pred)) != 0, 
          ok <- "There are NAN values in predictions", 
          ok <- "All predictions evaluated")
-  print(ok)
+  if(full.stats==TRUE) print(ok)
   
   # Error on the training set
   tr.error = mean(as.vector(main_tr_pred) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Prediction on test set
   pred_KNN = predict(mod_KNN, X_test)
@@ -522,26 +531,28 @@ knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=7){
 
   # Statistics
   statistics <- confusionMatrix(main_pred_KNN, y_test)
-  print(statistics)
-  
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
+    
   return(main_pred_KNN)
 }
 
-knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
+#knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 
 ### LASSO Logistic Regression
 
-```
-{r, lasso}
+```{r, lasso}
 
-lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
+lasso.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
+  cat("\n\n\t\t\t LASSO algorithm \n\n")
+  
   mod_LASSO = cv.glmnet(as.matrix(X_train), y_train, 
                         family = "multinomial", 
                         type.measure = "class",
                         parallel = T)
-  print(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se))
+  if(full.stats==TRUE) print(c("min" = mod_LASSO$lambda.min, "1se" = mod_LASSO$lambda.1se))
   
   pred_tr_LASSO = predict(mod_LASSO, newx = as.matrix(X_train), 
                           type = "class", 
@@ -551,7 +562,7 @@ lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
   tr.error = mean(as.vector(pred_tr_LASSO) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Prediction on test set
   pred_LASSO = predict(mod_LASSO, newx = as.matrix(X_test), type = "class", s = mod_LASSO$lambda.1se)
@@ -563,19 +574,22 @@ lasso.fit.predict <- function(X_train, y_train, X_test, y_test){
 
   # Statistics
   statistics <- confusionMatrix(test_pred_LASSO, y_test)
-  print(statistics)
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
   
   return(test_pred_LASSO)
 }
 
-lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
+#lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### SVM
 
 ```{r svm}
 
-svm.fit.predict <- function(X_train, y_train, X_test, y_test){
+svm.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
+  cat("\n\n\t\t\t SVM algorithm \n\n")
+  
   # Model
   mod.svm <-svm(x = X_train, y = y_train)
   
@@ -586,13 +600,13 @@ svm.fit.predict <- function(X_train, y_train, X_test, y_test){
   ifelse(sum(is.na(train.pred)) != 0, 
          ok <- "There are NAN values in predictions", 
          ok <- "All predictions evaluated")
-  print(ok)
+  if(full.stats==TRUE) print(ok)
   
   # Error on the training set
   tr.error = mean(as.vector(train.pred) != as.vector(y_train))*100
   cat(sprintf("\nTrain Missclassification rate: %f", round(tr.error,2)))
   
-  cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
+  if(full.stats==TRUE) cat("\n\n       Predictions on the TEST set\n ------------------------------------ \n")
   
   # Prediction on test set
   pred_svm = predict(mod.svm, X_test)
@@ -603,12 +617,13 @@ svm.fit.predict <- function(X_train, y_train, X_test, y_test){
 
   # Statistics
   statistics <- confusionMatrix(pred_svm, y_test)
-  print(statistics)
-  
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
+    
   return(pred_svm)
 }
 
-svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
+#svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 
@@ -630,41 +645,43 @@ We built **the stacking model** using the best tree models: k-NN, Random Forest 
 The idea is to use the predictions of majority. In a case that each classifier returns different class, we follow using the prediction of the best classifier: k-NN. 
 
 ```{r stacking}
-stacking.model <- function(knn.pred, random.forest.pred, svm.pred){
+stacking.model <- function(m1, m2, m3){
+  # m1, m2, m3 - are models with a high performance, whereas m1 - is the best model
+  
   # function to get a mode
   getmode <- function(v) {
    uniqv <- unique(v)
    uniqv[which.max(tabulate(match(v, uniqv)))]
   }
   # finding predictions from stacking model
-  n <- length(knn.pred)
+  n <- length(m1)
   final.pred <- rep(NA, n)
   # loop through predictions
   for(i in 1:n){
-    p1 <- knn.pred[i]
-    p2 <- random.forest.pred[i]
-    p3 <- svm.pred[i]
-    if(p1!=p2 & p2!=p3 & p1!=p3) {final.pred[i] = knn.pred[i]}
-    else {final.pred[i] = getmode(c(p1, p2, p3))}
+    if(m1[i]!=m2[i] & m2[i]!=m3[i] & m1[i]!=m3[i]) {final.pred[i] = m1[i]}
+    else {final.pred[i] = getmode(c(m1[i], m2[i], m3[i]))}
   }
   return(final.pred)
 }
 
-stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
+#stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
 ```
 
 
 ```{r stacking2}
-stacking.statistics <- function(stacking.pred, y_test){
+stacking.statistics <- function(stacking.pred, y_test, full.stats=TRUE){
+  cat("\n\n\t\t\t STACKING MODEL \n\n")
+  
   te.error = mean(stacking.pred !=  y_test)*100
   cat(sprintf("\nTest Missclassification rate: %f \n\n", round(te.error,2)))
 
   # Statistics
   statistics <- confusionMatrix(as.factor(stacking.pred), y_test)
-  print(statistics)
+  if(full.stats==TRUE) print(statistics)
+  else print(statistics$overall["Accuracy"])
 }
 
-stacking.statistics(stacking.pred, y_test)
+#stacking.statistics(stacking.pred, y_test)
 ```
 
 
@@ -674,15 +691,13 @@ stacking.statistics(stacking.pred, y_test)
 
 ## Numbers of possible bins with specific window.size and overlap
 
-```{r}
-
-whole.pipeline <- function(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df){
+```{r pipeline}
+whole.pipeline <- function(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df, window.size, overlap){
+  cat(paste("#################\n","window.size  = ", window.size, "\noverlap = ", overlap, "\n#################"))
+  
   ## Dividing into bins
-  window.size = 500
-  overlap = 200
-
   Ivana.bins <- slicer(Ivana.df, window.size=window.size, overlap = overlap)
-  cat(paste("Ivana", length(Ivana.bins)))
+  cat(paste("\nIvana", length(Ivana.bins)))
   Michele.bins <- slicer(Michele.df, window.size=window.size, overlap = overlap)
   cat(paste("\nMichele", length(Michele.bins)))
   Francesco.bins <- slicer(Francesco.df, window.size=window.size, overlap = overlap)
@@ -721,16 +736,17 @@ whole.pipeline <- function(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joa
   X_test$person_ID <- NULL
   
   ## Models and Predictions
-  RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
-  lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
-  naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
-  lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
-  svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
-  
+  RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test, full.stats = FALSE)
+  lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test, full.stats = FALSE)
+  naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test, full.stats = FALSE)
+  lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test, full.stats = FALSE)
+  knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test, k=7, full.stats = FALSE) #TODO: k via CrossVal
+  svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test, full.stats = FALSE)
+
   # Stacking model
-  stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
-  stacking.statistics(stacking.pred, y_test)
+  stacking.pred <- stacking.model(m1 = knn.pred, m2 = RF.pred, m3 = svm.pred)
+  stacking.statistics(stacking.pred, y_test, full.stats = FALSE)
 }
 
-whole.pipeline(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df)
+whole.pipeline(Ivana.df, Michele.df, Francesco.df, Francisca.df, Joanna.df, window.size=500, overlap=200)
 ```
