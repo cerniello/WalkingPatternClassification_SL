@@ -675,8 +675,10 @@ kn.accuracy <- 0.919
 lasso.accuracy <- 0.7266
 svm.accuracy <- 0.88
 
- #TODO : build table with accuracies of all methods for easier comaprison
- 
+|          | RndForest | LDA    | NaiveBayes | LASSO  | k-NN   | SVM  | Stacking |
+|----------|-----------|--------|------------|--------|--------|------|----------|
+| Accuracy | 0.9114    | 0.7164 | 0.6099     | 0.7266 | 0.7266 | 0.88 | 0.9184   |
+
 #### Stacking Model
 
 ```{r}
