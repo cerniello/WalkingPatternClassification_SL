@@ -426,7 +426,7 @@ randomForest.fit.predict <- function(X_train, y_train, X_test, y_test, full.stat
   return(predictions)
 }  
 
-#RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
+RF.pred <- randomForest.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### LDA
@@ -468,7 +468,7 @@ lda.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
   return(pred_LDA)
 }
 
-#lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
+lda.pred <- lda.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### Naive Bayes (parametric)
@@ -511,7 +511,7 @@ naivebayes.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=
   return(pred_NB)
 }
 
-#naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
+naivebayes.pred <- naivebayes.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### k-Nearest Neighbor
@@ -520,7 +520,7 @@ Cross validation in order to get the best k.
 
 ```{r knnCV}
 set.seed(123)
-registerDoParallel(cores=4)
+registerDoParallel(cores=1)
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 2)
 
 knn_fit <- train(y = y_train ,
@@ -574,7 +574,8 @@ knn.fit.predict <- function(X_train, y_train, X_test, y_test, k=knn_fit$bestTune
   return(main_pred_KNN)
 }
 
-#knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test)
+k_best = 7
+knn.pred <- knn.fit.predict(X_train, y_train, X_test, y_test, k = k_best)
 ```
 
 
@@ -617,7 +618,7 @@ lasso.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE)
   return(test_pred_LASSO)
 }
 
-#lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
+lasso.pred <-lasso.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 ### SVM
@@ -660,7 +661,7 @@ svm.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats=TRUE){
   return(pred_svm)
 }
 
-#svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
+svm.pred <- svm.fit.predict(X_train, y_train, X_test, y_test)
 ```
 
 
@@ -678,6 +679,21 @@ svm.accuracy <- 0.88
  
 #### Stacking Model
 
+```{r}
+## Majority voting using all the models
+
+stacking.pred.all <- cbind(knn   = as.character(knn.pred),
+                           RF    = as.character(RF.pred),
+                           LDA   = as.character(lda.pred$class),
+                           NaivB = as.character(naivebayes.pred),
+                           Lasso = as.character(lasso.pred),
+                           SVM   = as.character(svm.pred)    )
+
+# finding for each row (obs) the mode
+stacking.pred.all <- as.factor( apply(stacking.pred.all, 1, function(x) names(which.max(table(x))) ) )
+                  
+confusionMatrix(stacking.pred.all, y_test)
+```
 We built **the stacking model** using the best tree models: k-NN, Random Forest and SVM. 
 The idea is to use the predictions of majority. In a case that each classifier returns different class, we follow using the prediction of the best classifier: k-NN. 
 
@@ -702,6 +718,7 @@ stacking.model <- function(m1, m2, m3){
 }
 
 #stacking.pred <- stacking.model(knn.pred = knn.pred, random.forest.pred = RF.pred, svm.pred = svm.pred)
+stacking.pred <- stacking.model( knn.pred, RF.pred,  svm.pred)
 ```
 
 
@@ -718,8 +735,9 @@ stacking.statistics <- function(stacking.pred, y_test, full.stats=TRUE){
   else print(statistics$overall["Accuracy"])
 }
 
-#stacking.statistics(stacking.pred, y_test)
+stacking.statistics(stacking.pred, y_test)
 ```
+
 
 
 -----------------------------------------------
