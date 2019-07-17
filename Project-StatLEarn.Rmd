@@ -349,6 +349,43 @@ Proceeding with our super mega giga iper deeep machine Classificat networks neur
 
 ### Random Forest
 
+Choosing the appropriate number of trees (_ntrees_) based on _Out Of Bag_ (prediction) error rates. 
+
+```{r}
+# choosing the number of trees - based on X_train
+RF.model <- randomForest(x = X_train, y = y_train, ntree=300, proximity=T)
+
+head(RF.model$err.rate)
+```
+
+```{r}
+# using err.rate values from RF.model we create a dataframe in order to plot 
+# the OOB errors using ggplot
+oob.error <- data.frame(
+  nTrees = rep(1:nrow(RF.model$err.rate), times = 6),
+  Error.Type = rep(c('OOB', "1", "2", "3", "4", "5"), each =nrow(RF.model$err.rate)),
+  Error = c(RF.model$err.rate[, "OOB"], 
+            RF.model$err.rate[, 1],
+            RF.model$err.rate[, 2],
+            RF.model$err.rate[, 3],
+            RF.model$err.rate[, 4],
+            RF.model$err.rate[, 5])
+)
+
+head(oob.error, 3)
+```
+
+```{r}
+require(ggplot2)
+
+ggplot(data = oob.error, aes(x=nTrees, y = Error)) + 
+  geom_line(aes(color = Error.Type))
+
+```
+
+We observe that the overall and relatives OOB error rates stabilize for a number of trees around 100, an appropriate setting for the parameter could be _ntree = 150_.
+
+
 ```{r, randomForest}
 randomForest.fit.predict <- function(X_train, y_train, X_test, y_test, full.stats = TRUE){ 
   cat("\n\n\t\t\t RANDOM FOREST algorithm \n\n")
